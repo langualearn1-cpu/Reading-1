@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مبادرة القراءة - Reading Initiative</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;900&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Fredoka', 'Cairo', sans-serif;
+            background-color: #fdfbf7;
+            background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+            background-size: 24px 24px;
+            overflow-x: hidden;
+        }
+
+        .en-font {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        /* تأثيرات التضليل أثناء القراءة */
+        .word-box {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 4px solid #6b1d4a;
+            box-shadow: 0 4px 0 #6b1d4a;
+        }
+
+        .card-active {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        .word-highlight {
+            background-color: #fef08a !important; /* أصفر ذهبي للتضليل */
+            color: #b45309 !important;
+            border-color: #d97706 !important;
+            box-shadow: 0 0 20px rgba(250, 204, 21, 0.8), 0 4px 0 #d97706 !important;
+            transform: scale(1.08);
+        }
+
+        /* دوائر الإنجاز */
+        .check-circle {
+            width: 38px;
+            height: 38px;
+            border: 3.5px solid #6b1d4a;
+            background-color: white;
+            transition: all 0.3s ease;
+        }
+
+        .check-circle.completed {
+            background-color: #22c55e;
+            border-color: #15803d;
+            color: white;
+            transform: rotate(360deg) scale(1.1);
+        }
+
+        /* حركات للرسومات */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-7px); }
+        }
+
+        .svg-illustration {
+            animation: float 3.5s ease-in-out infinite;
+            filter: drop-shadow(0 8px 12px rgba(0,0,0,0.08));
+            transition: transform 0.3s ease;
+        }
+
+        .vocab-card:hover .svg-illustration {
+            transform: scale(1.08) rotate(2deg);
+        }
+
+        .rainbow-title span {
+            display: inline-block;
+            text-shadow: 2px 2px 0px #3f1d38, -1px -1px 0px #3f1d38, 1px -1px 0px #3f1d38, -1px 1px 0px #3f1d38, 0px 3px 0px #3f1d38;
+            transition: transform 0.2s;
+        }
+        .rainbow-title span:hover {
+            transform: translateY(-5px) scale(1.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800">
+
+    <!-- شريط التنقل العلوي -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-amber-200 sticky top-0 z-40 px-4 py-3 shadow-sm">
+        <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-amber-400 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-book-open-reader text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-800 leading-none">Reading Initiative</h1>
+                    <span class="text-xs text-slate-500">Canadian Female Voice (en-CA)</span>
+                </div>
+            </div>
+
+            <!-- لوحة التحكم بالصوت والعرض -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                <!-- زر القراءة المتتابعة -->
+                <button id="playAllBtn" onclick="togglePlayAll()" class="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-xl font-bold shadow-md hover:shadow-lg transition active:scale-95 text-sm">
+                    <i id="playAllIcon" class="fa-solid fa-play"></i>
+                    <span id="playAllText">Play All Words</span>
+                </button>
+
+                <!-- زر السرعة -->
+                <button id="speedBtn" onclick="toggleSpeed()" class="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 px-3 py-2 rounded-xl font-bold transition text-sm" title="Speech Speed">
+                    <i class="fa-solid fa-gauge-high text-amber-600"></i>
+                    <span id="speedText">Normal (1x)</span>
+                </button>
+
+                <!-- زر تبديل نمط الدرس -->
+                <div class="bg-slate-100 p-1 rounded-xl border border-slate-200 flex items-center text-xs sm:text-sm font-bold">
+                    <button onclick="setMode('words')" id="modeWords" class="px-3 py-1.5 rounded-lg bg-white text-pink-700 shadow-sm transition">Words</button>
+                    <button onclick="setMode('quiz')" id="modeQuiz" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">Quiz Game</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="max-w-5xl w-full mx-auto px-4 py-6 flex-grow">
+
+        <!-- ترويسة البطاقة -->
+        <header class="relative bg-gradient-to-b from-amber-50/90 to-orange-50/50 rounded-3xl p-6 mb-8 border-2 border-amber-200/80 shadow-sm overflow-hidden text-center">
+            <div class="absolute -top-6 -right-6 w-28 h-28 bg-pink-200/50 rounded-full blur-md pointer-events-none"></div>
+            <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-sky-200/50 rounded-full blur-md pointer-events-none"></div>
+            
+            <div class="flex justify-center items-center gap-3 mb-2">
+                <i class="fa-solid fa-cloud text-sky-300 text-2xl animate-pulse"></i>
+                <i class="fa-solid fa-star text-amber-400 text-xl"></i>
+                <span class="bg-white/80 backdrop-blur px-4 py-1 rounded-full text-xs font-bold text-pink-800 border border-pink-200 shadow-sm">
+                    Interactive English Reading Lesson (LTR)
+                </span>
+                <i class="fa-solid fa-star text-amber-400 text-xl"></i>
+                <i class="fa-solid fa-pencil text-orange-400 text-xl"></i>
+            </div>
+
+            <!-- عنوان مبادرة القراءة -->
+            <h2 class="text-4xl sm:text-5xl font-black tracking-wide my-2 rainbow-title select-none">
+                <span class="text-pink-400">R</span><span class="text-sky-400">e</span><span class="text-emerald-400">a</span><span class="text-amber-400">d</span><span class="text-rose-500">i</span><span class="text-orange-400">n</span><span class="text-yellow-400">g</span>
+                <span class="mx-2"></span>
+                <span class="text-emerald-400">I</span><span class="text-pink-500">n</span><span class="text-sky-500">i</span><span class="text-purple-500">t</span><span class="text-amber-500">i</span><span class="text-rose-400">a</span><span class="text-teal-400">t</span><span class="text-indigo-400">i</span><span class="text-pink-400">v</span><span class="text-orange-400">e</span>
+            </h2>
+
+            <!-- شريط الإنجاز -->
+            <div class="max-w-md mx-auto mt-4 flex items-center gap-3 bg-white/80 px-4 py-2 rounded-2xl border border-amber-200/60 shadow-inner">
+                <span class="text-xs font-bold text-slate-600 whitespace-nowrap">Progress:</span>
+                <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+                    <div id="progressBar" class="bg-gradient-to-r from-emerald-400 to-green-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <span id="progressCount" class="text-xs font-black text-emerald-700 whitespace-nowrap">0 / 8</span>
+                <button onclick="resetProgress()" class="text-slate-400 hover:text-rose-500 transition text-xs" title="Reset">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- قسم الاختبار التفاعلي -->
+        <section id="quizBanner" class="hidden mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-3xl animate-bounce">
+                    🎧
+                </div>
+                <div>
+                    <h3 class="font-bold text-xl">Listening Challenge!</h3>
+                    <p id="quizInstruction" class="text-indigo-100 text-sm">Listen to the word and click the correct card</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="repeatQuizWord()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2">
+                    <i class="fa-solid fa-volume-high"></i>
+                    <span>Repeat Word</span>
+                </button>
+                <div class="bg-white/20 px-4 py-2 rounded-xl text-center">
+                    <span class="text-xs block text-indigo-200">Score</span>
+                    <span id="quizScore" class="font-black text-xl">0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- شبكة البطاقات -->
+        <section id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- يتم توليد البطاقات ديناميكياً -->
+        </section>
+
+    </main>
+
+    <!-- شريط الحالة العائم في الأسفل -->
+    <div id="readingBar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-6 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-4 transition-all duration-300 opacity-0 pointer-events-none translate-y-10">
+        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
+        <div>
+            <span class="text-xs text-slate-400 block">Canadian Female Voice (en-CA):</span>
+            <div id="readingBarContent" class="en-font text-xl font-bold text-amber-300 tracking-wider"></div>
+        </div>
+    </div>
+
+    <!-- تذييل الصفحة -->
+    <footer class="bg-white border-t border-slate-200 mt-12 py-6 px-4 text-center text-sm text-slate-500">
+        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-700">Reading Initiative</span>
+                <span>•</span>
+                <span>Designed for GitHub Pages</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-xs bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                    <i class="fa-solid fa-volume-high text-pink-500 mr-1"></i>
+                    en-CA Speech Synthesis
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- الأكواد البرمجية -->
+    <script>
+        const lessonsData = [
+            {
+                id: 'balloons',
+                word: 'balloons',
+                translation: 'بالونات',
+                phonetic: '/bəˈluːnz/',
+                bgClass: 'bg-[#d9eef7]',
+                borderClass: 'border-[#b3d9ea]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <path d="M60 85 L80 122 M75 88 L80 122 M85 88 L80 122 M100 85 L80 122 M50 90 L80 122" stroke="#555" stroke-width="1.8" fill="none"/>
+                    <path d="M75 118 Q80 123 85 118" stroke="#555" stroke-width="2" fill="none"/>
+                    <ellipse cx="62" cy="40" rx="18" ry="22" fill="#5aa9d6" stroke="#3b6e8c" stroke-width="2"/>
+                    <ellipse cx="56" cy="32" rx="4" ry="7" fill="#9ad1f0" opacity="0.6"/>
+                    <ellipse cx="86" cy="36" rx="19" ry="23" fill="#e69145" stroke="#995b24" stroke-width="2"/>
+                    <ellipse cx="80" cy="28" rx="4" ry="7" fill="#f7c394" opacity="0.6"/>
+                    <ellipse cx="106" cy="48" rx="18" ry="22" fill="#7fb872" stroke="#4d7544" stroke-width="2"/>
+                    <ellipse cx="50" cy="64" rx="18" ry="22" fill="#f2cf46" stroke="#9e841f" stroke-width="2"/>
+                    <ellipse cx="44" cy="57" rx="4" ry="6" fill="#fff2b2" opacity="0.7"/>
+                    <ellipse cx="96" cy="66" rx="18" ry="22" fill="#a86fa3" stroke="#6b4168" stroke-width="2"/>
+                    <ellipse cx="90" cy="59" rx="4" ry="6" fill="#dec0dc" opacity="0.6"/>
+                    <ellipse cx="73" cy="62" rx="19" ry="23" fill="#de5d62" stroke="#8f3236" stroke-width="2"/>
+                    <ellipse cx="66" cy="54" rx="5" ry="8" fill="#f7a8ab" opacity="0.6"/>
+                </svg>`
+            },
+            {
+                id: 'bus',
+                word: 'bus',
+                translation: 'حافلة مدرسية',
+                phonetic: '/bʌs/',
+                bgClass: 'bg-[#f8e2df]',
+                borderClass: 'border-[#ebd0cc]',
+                svg: `
+                <svg viewBox="0 0 180 130" class="w-44 h-32 mx-auto svg-illustration">
+                    <ellipse cx="90" cy="108" rx="68" ry="6" fill="#000" opacity="0.12"/>
+                    <path d="M22 45 Q22 30 38 30 L132 30 Q145 30 148 48 L158 65 Q162 70 162 80 L162 92 Q162 98 154 98 L25 98 Q18 98 18 90 Z" fill="#f3c644" stroke="#5c4518" stroke-width="2.5"/>
+                    <line x1="18" y1="74" x2="162" y2="74" stroke="#5c4518" stroke-width="3"/>
+                    <line x1="18" y1="80" x2="145" y2="80" stroke="#d49b27" stroke-width="3"/>
+                    <rect x="28" y="40" width="18" height="22" rx="3" fill="#c7e4eb" stroke="#5c4518" stroke-width="2"/>
+                    <rect x="52" y="40" width="18" height="22" rx="3" fill="#c7e4eb" stroke="#5c4518" stroke-width="2"/>
+                    <rect x="76" y="40" width="18" height="22" rx="3" fill="#c7e4eb" stroke="#5c4518" stroke-width="2"/>
+                    <rect x="102" y="40" width="18" height="52" rx="3" fill="#dfeff2" stroke="#5c4518" stroke-width="2"/>
+                    <line x1="111" y1="40" x2="111" y2="92" stroke="#5c4518" stroke-width="2"/>
+                    <path d="M126 40 L141 40 L147 62 L126 62 Z" fill="#c7e4eb" stroke="#5c4518" stroke-width="2"/>
+                    <circle cx="158" cy="84" r="4" fill="#fff3b0" stroke="#5c4518" stroke-width="1.5"/>
+                    <circle cx="48" cy="98" r="14" fill="#3a3335" stroke="#221d1e" stroke-width="2"/>
+                    <circle cx="48" cy="98" r="6" fill="#d9d4d6"/>
+                    <circle cx="136" cy="98" r="14" fill="#3a3335" stroke="#221d1e" stroke-width="2"/>
+                    <circle cx="136" cy="98" r="6" fill="#d9d4d6"/>
+                </svg>`
+            },
+            {
+                id: 'camera',
+                word: 'camera',
+                translation: 'كاميرا رقمية',
+                phonetic: '/ˈkæm.rə/',
+                bgClass: 'bg-[#f6dfc0]',
+                borderClass: 'border-[#e6c8a1]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <rect x="42" y="28" width="18" height="10" rx="3" fill="#e38878" stroke="#593a34" stroke-width="2"/>
+                    <path d="M66 36 L74 24 L98 24 L106 36 Z" fill="#d5dce0" stroke="#593a34" stroke-width="2"/>
+                    <rect x="28" y="35" width="108" height="72" rx="14" fill="#b7d2db" stroke="#593a34" stroke-width="2.5"/>
+                    <rect x="28" y="54" width="108" height="36" fill="#eb9486" stroke="#593a34" stroke-width="2"/>
+                    <rect x="112" y="42" width="14" height="8" rx="2" fill="#fff7d6" stroke="#593a34" stroke-width="1.8"/>
+                    <circle cx="42" cy="46" r="4" fill="#f26b5e" stroke="#593a34" stroke-width="1.5"/>
+                    <circle cx="84" cy="72" r="28" fill="#e6eff2" stroke="#593a34" stroke-width="2.5"/>
+                    <circle cx="84" cy="72" r="21" fill="#90c2d4" stroke="#593a34" stroke-width="2"/>
+                    <circle cx="76" cy="70" r="2.8" fill="#3b2622"/>
+                    <circle cx="92" cy="70" r="2.8" fill="#3b2622"/>
+                    <path d="M80 75 Q84 79 88 75" stroke="#3b2622" stroke-width="2" fill="none" stroke-linecap="round"/>
+                    <circle cx="72" cy="62" r="4" fill="#ffffff" opacity="0.7"/>
+                </svg>`
+            },
+            {
+                id: 'drums',
+                word: 'drums',
+                translation: 'طبول',
+                phonetic: '/drʌmz/',
+                bgClass: 'bg-[#fcf5e3]',
+                borderClass: 'border-[#ede1c5]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <line x1="38" y1="22" x2="76" y2="52" stroke="#b88456" stroke-width="5" stroke-linecap="round"/>
+                    <circle cx="78" cy="53" r="4.5" fill="#d9a779" stroke="#5c3c20" stroke-width="1.5"/>
+                    <line x1="122" y1="22" x2="84" y2="52" stroke="#b88456" stroke-width="5" stroke-linecap="round"/>
+                    <circle cx="82" cy="53" r="4.5" fill="#d9a779" stroke="#5c3c20" stroke-width="1.5"/>
+                    <path d="M40 55 L40 94 Q80 110 120 94 L120 55 Z" fill="#d9534f" stroke="#4a2524" stroke-width="2.5"/>
+                    <polyline points="40,68 55,95 70,68 85,98 100,68 115,94 120,75" fill="none" stroke="#f7e3af" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M38 90 Q80 106 122 90 L122 97 Q80 113 38 97 Z" fill="#7a93a6" stroke="#4a2524" stroke-width="2"/>
+                    <ellipse cx="80" cy="55" rx="42" ry="14" fill="#fcf0d2" stroke="#4a2524" stroke-width="2.5"/>
+                    <ellipse cx="80" cy="55" rx="36" ry="10" fill="none" stroke="#e6cfa1" stroke-width="1.5"/>
+                </svg>`
+            },
+            {
+                id: 'guitar',
+                word: 'guitar',
+                translation: 'جيتار',
+                phonetic: '/ɡɪˈtɑːr/',
+                bgClass: 'bg-[#fcf5e8]',
+                borderClass: 'border-[#ebdDC5]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <g transform="rotate(-32 80 68)">
+                        <rect x="74" y="8" width="12" height="58" fill="#8c583a" stroke="#422616" stroke-width="2"/>
+                        <rect x="71" y="-4" width="18" height="15" rx="3" fill="#b87b4b" stroke="#422616" stroke-width="2"/>
+                        <circle cx="68" cy="0" r="2.5" fill="#e6d2b5" stroke="#422616" stroke-width="1.2"/>
+                        <circle cx="68" cy="6" r="2.5" fill="#e6d2b5" stroke="#422616" stroke-width="1.2"/>
+                        <circle cx="92" cy="0" r="2.5" fill="#e6d2b5" stroke="#422616" stroke-width="1.2"/>
+                        <circle cx="92" cy="6" r="2.5" fill="#e6d2b5" stroke="#422616" stroke-width="1.2"/>
+                        <path d="M80 52 C60 52 55 72 67 82 C50 92 52 122 80 122 C108 122 110 92 93 82 C105 72 100 52 80 52 Z" fill="#d99b52" stroke="#422616" stroke-width="2.5"/>
+                        <circle cx="80" cy="80" r="10" fill="#422616" stroke="#f5d393" stroke-width="2"/>
+                        <rect x="70" y="102" width="20" height="5" rx="2" fill="#59341e" stroke="#422616" stroke-width="1.5"/>
+                        <line x1="77" y1="8" x2="77" y2="102" stroke="#fff8e7" stroke-width="1"/>
+                        <line x1="80" y1="8" x2="80" y2="102" stroke="#fff8e7" stroke-width="1"/>
+                        <line x1="83" y1="8" x2="83" y2="102" stroke="#fff8e7" stroke-width="1"/>
+                    </g>
+                </svg>`
+            },
+            {
+                id: 'photo',
+                word: 'photo',
+                translation: 'صورة',
+                phonetic: '/ˈfoʊ.toʊ/',
+                bgClass: 'bg-[#cbe7f2]',
+                borderClass: 'border-[#a7d4e6]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <g transform="rotate(-7 80 65)">
+                        <rect x="44" y="20" width="72" height="84" rx="3" fill="#ffffff" stroke="#4a5859" stroke-width="2"/>
+                    </g>
+                    <rect x="44" y="20" width="72" height="84" rx="3" fill="#ffffff" stroke="#4a5859" stroke-width="2.5"/>
+                    <rect x="50" y="26" width="60" height="60" fill="#a8d8ea" stroke="#4a5859" stroke-width="1.5"/>
+                    <path d="M58 40 Q63 35 68 40 Q74 37 76 42 L56 42 Z" fill="#ffffff"/>
+                    <polygon points="50,86 68,48 88,86" fill="#6b8e63" stroke="#4a5859" stroke-width="1.5"/>
+                    <polygon points="68,48 62,60 68,57 74,60" fill="#ffffff"/>
+                    <polygon points="72,86 92,44 110,86" fill="#52734d" stroke="#4a5859" stroke-width="1.5"/>
+                    <polygon points="92,44 85,58 92,55 99,58" fill="#ffffff"/>
+                    <path d="M50 75 Q80 70 110 76 L110 86 L50 86 Z" fill="#8ac97a"/>
+                    <path d="M82 74 Q74 80 66 86 L78 86 Q84 80 88 74 Z" fill="#71c7ec"/>
+                </svg>`
+            },
+            {
+                id: 'playground',
+                word: 'playground',
+                translation: 'ملعب',
+                phonetic: '/ˈpleɪ.ɡraʊnd/',
+                bgClass: 'bg-[#e8b698]',
+                borderClass: 'border-[#d49b79]',
+                svg: `
+                <svg viewBox="0 0 190 130" class="w-44 h-32 mx-auto svg-illustration">
+                    <ellipse cx="95" cy="102" rx="80" ry="18" fill="#82b366"/>
+                    <circle cx="32" cy="68" r="14" fill="#5e8c47"/>
+                    <rect x="30" y="78" width="4" height="16" fill="#785233"/>
+                    <circle cx="156" cy="70" r="12" fill="#5e8c47"/>
+                    <rect x="154" y="78" width="4" height="16" fill="#785233"/>
+                    <rect x="46" y="42" width="26" height="54" fill="#d9a76c" stroke="#593b1d" stroke-width="2"/>
+                    <polygon points="41,42 59,24 77,42" fill="#d9534f" stroke="#593b1d" stroke-width="2"/>
+                    <line x1="46" y1="65" x2="34" y2="96" stroke="#593b1d" stroke-width="2.5"/>
+                    <line x1="52" y1="65" x2="40" y2="96" stroke="#593b1d" stroke-width="2.5"/>
+                    <line x1="43" y1="73" x2="49" y2="73" stroke="#593b1d" stroke-width="2"/>
+                    <line x1="40" y1="81" x2="46" y2="81" stroke="#593b1d" stroke-width="2"/>
+                    <line x1="37" y1="89" x2="43" y2="89" stroke="#593b1d" stroke-width="2"/>
+                    <path d="M68 65 Q85 68 92 94 L104 98 Q95 65 72 58 Z" fill="#f0ad4e" stroke="#593b1d" stroke-width="2"/>
+                    <line x1="112" y1="94" x2="122" y2="48" stroke="#785233" stroke-width="3"/>
+                    <line x1="148" y1="94" x2="138" y2="48" stroke="#785233" stroke-width="3"/>
+                    <line x1="118" y1="48" x2="144" y2="48" stroke="#785233" stroke-width="3.5"/>
+                    <line x1="126" y1="48" x2="126" y2="78" stroke="#555" stroke-width="1.5"/>
+                    <line x1="136" y1="48" x2="136" y2="78" stroke="#555" stroke-width="1.5"/>
+                    <rect x="122" y="78" width="18" height="4" rx="2" fill="#d9534f" stroke="#593b1d" stroke-width="1.2"/>
+                </svg>`
+            },
+            {
+                id: 'poster',
+                word: 'poster',
+                translation: 'ملصق',
+                phonetic: '/ˈpoʊ.stər/',
+                bgClass: 'bg-[#fbf4e4]',
+                borderClass: 'border-[#ebdec0]',
+                svg: `
+                <svg viewBox="0 0 160 130" class="w-36 h-32 mx-auto svg-illustration">
+                    <path d="M62 22 L80 10 L98 22" fill="none" stroke="#8c6239" stroke-width="2"/>
+                    <circle cx="80" cy="10" r="3" fill="#d9822b" stroke="#593714" stroke-width="1.5"/>
+                    <rect x="42" y="20" width="76" height="6" rx="3" fill="#8a9ba8" stroke="#3e4a52" stroke-width="2"/>
+                    <rect x="42" y="102" width="76" height="6" rx="3" fill="#8a9ba8" stroke="#3e4a52" stroke-width="2"/>
+                    <rect x="46" y="26" width="68" height="76" fill="#fffdf7" stroke="#3e4a52" stroke-width="2"/>
+                    <circle cx="96" cy="40" r="7" fill="#f7c948"/>
+                    <path d="M54 42 Q62 34 70 42" stroke="#5aa9d6" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <rect x="54" y="54" width="22" height="16" rx="2" fill="#a3d9a5" stroke="#4f7550" stroke-width="1.5"/>
+                    <rect x="82" y="54" width="24" height="16" rx="2" fill="#f5b0bd" stroke="#8c4f5a" stroke-width="1.5"/>
+                    <circle cx="64" cy="84" r="5" fill="#f2c1a0" stroke="#3e4a52" stroke-width="1.5"/>
+                    <path d="M58 96 Q64 88 70 96" fill="#e66767" stroke="#3e4a52" stroke-width="1.5"/>
+                    <circle cx="94" cy="84" r="5" fill="#f2c1a0" stroke="#3e4a52" stroke-width="1.5"/>
+                    <path d="M88 96 Q94 88 100 96" fill="#5aa9d6" stroke="#3e4a52" stroke-width="1.5"/>
+                </svg>`
+            }
+        ];
+
+        let currentMode = 'words';
+        let speechRate = 0.75;
+        let completedCards = new Set();
+        let isPlayingAll = false;
+        let playAllIndex = 0;
+        let activeTimeouts = [];
+        let currentQuizTarget = null;
+        let quizScore = 0;
+
+        window.onload = function() {
+            setMode('words');
+            updateProgressUI();
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.getVoices();
+                window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+            }
+        };
+
+        function getCanadianFemaleVoice(utterance) {
+            if (!('speechSynthesis' in window)) return;
+            const voices = window.speechSynthesis.getVoices();
+            let selectedVoice = voices.find(v => (v.lang.includes('en-CA') || v.lang.includes('en_CA')) && (v.name.includes('Female') || v.name.includes('Amelie') || v.name.includes('Heather') || v.name.includes('Linda') || v.name.includes('Clara')));
+            if (!selectedVoice) selectedVoice = voices.find(v => v.lang.includes('en-CA'));
+            if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Zira')));
+            if (!selectedVoice && voices.length > 0) selectedVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+            if (selectedVoice) utterance.voice = selectedVoice;
+        }
+
+        function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            grid.innerHTML = '';
+
+            lessonsData.forEach((item, index) => {
+                const isDone = completedCards.has(item.id);
+
+                const card = document.createElement('div');
+                card.id = `card-${item.id}`;
+                card.className = `vocab-card relative ${item.bgClass} ${item.borderClass} border-2 rounded-3xl p-5 cursor-pointer transition-all duration-300 select-none overflow-hidden shadow-sm hover:shadow-md flex flex-col items-center justify-between`;
+                card.onclick = (e) => handleCardClick(item, index, e);
+
+                card.innerHTML = `
+                    <div class="w-full flex items-center justify-between mb-2">
+                        <button onclick="toggleComplete('${item.id}', event)" id="check-${item.id}" 
+                            class="check-circle rounded-full flex items-center justify-center shadow-sm ${isDone ? 'completed' : ''}"
+                            title="Mark as completed">
+                            <i class="fa-solid fa-check text-lg ${isDone ? 'opacity-100' : 'opacity-0'} transition-opacity"></i>
+                        </button>
+
+                        <div class="flex items-center gap-2">
+                            <span class="en-font text-xs text-slate-600 bg-white/60 px-2.5 py-1 rounded-full hidden sm:inline-block font-semibold">
+                                ${item.phonetic}
+                            </span>
+                            <span class="bg-white/90 backdrop-blur px-3.5 py-1 rounded-full text-sm font-bold text-slate-800 shadow-sm border border-white">
+                                ${item.translation}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="my-3 relative flex items-center justify-center">
+                        ${item.svg}
+                    </div>
+
+                    <div id="wordbox-${item.id}" class="word-box bg-white rounded-2xl py-3.5 px-8 my-2 mx-auto text-center relative flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-volume-high text-[#6b1d4a] text-xl animate-pulse"></i>
+                        <span id="wordtext-${item.id}" class="en-font text-3xl sm:text-4xl font-extrabold text-[#146c94] tracking-wide">
+                            ${item.word}
+                        </span>
+                    </div>
+
+                    <div class="text-xs text-slate-500 mt-1 font-bold">Click to hear the word clearly</div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        function clearAllHighlights() {
+            activeTimeouts.forEach(t => clearTimeout(t));
+            activeTimeouts = [];
+            document.querySelectorAll('.vocab-card').forEach(el => el.classList.remove('card-active'));
+            document.querySelectorAll('.word-box').forEach(el => el.classList.remove('word-highlight'));
+        }
+
+        function handleCardClick(item, index, event) {
+            if (currentMode === 'quiz') {
+                checkQuizAnswer(item);
+                return;
+            }
+            speakWord(item.id, event);
+        }
+
+        function speakWord(itemId, event, onCompleteCallback = null) {
+            if (event) event.stopPropagation();
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            clearAllHighlights();
+
+            const item = lessonsData.find(d => d.id === itemId);
+            if (!item) return;
+
+            const cardEl = document.getElementById(`card-${item.id}`);
+            const wordBoxEl = document.getElementById(`wordbox-${item.id}`);
+            cardEl.classList.add('card-active');
+            wordBoxEl.classList.add('word-highlight');
+
+            showReadingBar(`Canadian Voice (Educational): "${item.word}"`);
+
+            const utterance = new SpeechSynthesisUtterance(item.word);
+            utterance.lang = 'en-CA';
+            utterance.rate = speechRate;
+            utterance.pitch = 1.15;
+
+            getCanadianFemaleVoice(utterance);
+
+            utterance.onend = () => {
+                const endTimer = setTimeout(() => {
+                    wordBoxEl.classList.remove('word-highlight');
+                    cardEl.classList.remove('card-active');
+                    hideReadingBar();
+                    markAsCompleted(item.id);
+                    if (onCompleteCallback) onCompleteCallback();
+                }, 500);
+                activeTimeouts.push(endTimer);
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function togglePlayAll() {
+            const btn = document.getElementById('playAllBtn');
+            const icon = document.getElementById('playAllIcon');
+            const text = document.getElementById('playAllText');
+
+            if (isPlayingAll) {
+                stopPlayAll();
+                return;
+            }
+
+            isPlayingAll = true;
+            playAllIndex = 0;
+            icon.className = 'fa-solid fa-stop';
+            text.innerText = 'Stop Reading';
+            btn.classList.replace('from-emerald-500', 'from-rose-500');
+            btn.classList.replace('to-teal-600', 'to-red-600');
+
+            playNextInSequence();
+        }
+
+        function playNextInSequence() {
+            if (!isPlayingAll || playAllIndex >= lessonsData.length) {
+                stopPlayAll();
+                return;
+            }
+
+            const currentItem = lessonsData[playAllIndex];
+            const cardEl = document.getElementById(`card-${currentItem.id}`);
+            if (cardEl) {
+                cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            speakWord(currentItem.id, null, () => {
+                if (isPlayingAll) {
+                    playAllIndex++;
+                    const nextTimer = setTimeout(playNextInSequence, 700);
+                    activeTimeouts.push(nextTimer);
+                }
+            });
+        }
+
+        function stopPlayAll() {
+            isPlayingAll = false;
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            clearAllHighlights();
+            hideReadingBar();
+
+            const btn = document.getElementById('playAllBtn');
+            const icon = document.getElementById('playAllIcon');
+            const text = document.getElementById('playAllText');
+
+            icon.className = 'fa-solid fa-play';
+            text.innerText = 'Play All Words';
+            btn.classList.replace('from-rose-500', 'from-emerald-500');
+            btn.classList.replace('to-red-600', 'to-teal-600');
+        }
+
+        function toggleSpeed() {
+            const speedText = document.getElementById('speedText');
+            if (speechRate === 0.75) {
+                speechRate = 0.55;
+                speedText.innerText = 'Very Slow (0.5x)';
+            } else if (speechRate === 0.55) {
+                speechRate = 0.95;
+                speedText.innerText = 'Normal (1x)';
+            } else {
+                speechRate = 0.75;
+                speedText.innerText = 'Calm (0.7x)';
+            }
+        }
+
+        function setMode(mode) {
+            stopPlayAll();
+            currentMode = mode;
+
+            ['words', 'quiz'].forEach(m => {
+                const btn = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (btn) {
+                    if (m === mode) {
+                        btn.className = 'px-4 py-1.5 rounded-lg bg-white text-pink-700 shadow-sm transition';
+                    } else {
+                        btn.className = 'px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                    }
+                }
+            });
+
+            renderCards();
+
+            const quizBanner = document.getElementById('quizBanner');
+            if (mode === 'quiz') {
+                quizBanner.classList.remove('hidden');
+                startNewQuizQuestion();
+            } else {
+                quizBanner.classList.add('hidden');
+            }
+        }
+
+        function startNewQuizQuestion() {
+            const randomIndex = Math.floor(Math.random() * lessonsData.length);
+            currentQuizTarget = lessonsData[randomIndex];
+            document.getElementById('quizInstruction').innerText = 'Listen to the word in Canadian voice and click the correct card!';
+            setTimeout(() => repeatQuizWord(), 300);
+        }
+
+        function repeatQuizWord() {
+            if (!currentQuizTarget) return;
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(currentQuizTarget.word);
+            utterance.lang = 'en-CA';
+            utterance.rate = 0.75;
+            utterance.pitch = 1.15;
+            getCanadianFemaleVoice(utterance);
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function checkQuizAnswer(selectedItem) {
+            if (!currentQuizTarget) return;
+            const wordBox = document.getElementById(`wordbox-${selectedItem.id}`);
+
+            if (selectedItem.id === currentQuizTarget.id) {
+                quizScore += 10;
+                document.getElementById('quizScore').innerText = quizScore;
+                document.getElementById('quizInstruction').innerHTML = `<span class="text-amber-300 font-bold">Excellent job! 🎉</span>`;
+                wordBox.classList.add('word-highlight');
+                markAsCompleted(selectedItem.id);
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+                }
+                setTimeout(() => {
+                    wordBox.classList.remove('word-highlight');
+                    startNewQuizQuestion();
+                }, 1600);
+            } else {
+                document.getElementById('quizInstruction').innerHTML = `<span class="text-rose-200 font-bold">Try again! 🎧</span>`;
+                repeatQuizWord();
+            }
+        }
+
+        function toggleComplete(itemId, event) {
+            if (event) event.stopPropagation();
+            if (completedCards.has(itemId)) {
+                completedCards.delete(itemId);
+            } else {
+                completedCards.add(itemId);
+            }
+            updateCheckCircleUI(itemId);
+            updateProgressUI();
+        }
+
+        function markAsCompleted(itemId) {
+            if (!completedCards.has(itemId)) {
+                completedCards.add(itemId);
+                updateCheckCircleUI(itemId);
+                updateProgressUI();
+                if (completedCards.size === lessonsData.length && typeof confetti === 'function') {
+                    confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
+                }
+            }
+        }
+
+        function updateCheckCircleUI(itemId) {
+            const btn = document.getElementById(`check-${itemId}`);
+            if (!btn) return;
+            const icon = btn.querySelector('i');
+            if (completedCards.has(itemId)) {
+                btn.classList.add('completed');
+                icon.classList.replace('opacity-0', 'opacity-100');
+            } else {
+                btn.classList.remove('completed');
+                icon.classList.replace('opacity-100', 'opacity-0');
+            }
+        }
+
+        function updateProgressUI() {
+            const count = completedCards.size;
+            const total = lessonsData.length;
+            const percent = Math.round((count / total) * 100);
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressCount').innerText = `${count} / ${total}`;
+        }
+
+        function resetProgress() {
+            completedCards.clear();
+            lessonsData.forEach(item => updateCheckCircleUI(item.id));
+            updateProgressUI();
+        }
+
+        function showReadingBar(text) {
+            const bar = document.getElementById('readingBar');
+            const content = document.getElementById('readingBarContent');
+            content.innerText = text;
+            bar.classList.remove('opacity-0', 'translate-y-10');
+            bar.classList.add('opacity-100', 'translate-y-0');
+        }
+
+        function hideReadingBar() {
+            const bar = document.getElementById('readingBar');
+            bar.classList.add('opacity-0', 'translate-y-10');
+            bar.classList.remove('opacity-100', 'translate-y-0');
+        }
+    </script>
+</body>
+</html>
